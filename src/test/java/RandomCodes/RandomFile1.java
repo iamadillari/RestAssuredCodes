@@ -1,81 +1,67 @@
-package RandomCodes;
+/**
+ * Validates client encryption key types in the database
+ * 
+ * @param axonEnckeyMessage The encryption key message
+ * @param clientId The client ID to validate
+ * @param keyTypes The expected key types to verify
+ * @throws SQLException if there's a database error
+ */
+protected void verifyEncryptionKeyEventKeyTypeInDB(AxonEnckeyMessage axonEnckeyMessage, 
+                                                 String clientId, 
+                                                 KeyType... keyTypes) throws SQLException {
+    if (keyTypes == null || keyTypes.length == 0) {
+        throw new IllegalArgumentException("At least one key type must be provided");
+    }
+    
+    List<String> expectedKeyTypes = Arrays.stream(keyTypes)
+                                        .map(Enum::name)
+                                        .collect(Collectors.toList());
+    
+    validateClientEncryption(clientId, expectedKeyTypes);
+}
 
-import RandomCodes.Pet.Tag;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.restassured.RestAssured;
-import io.restassured.http.ContentType;
-import io.restassured.response.Response;
-import org.testng.annotations.Test;
-
-import java.util.Arrays;
-import java.util.List;
-
-import static io.restassured.RestAssured.given;
-
-public class RandomFile1 {
-
-    @Test
-    public void createPetWithoutBuilderTest() throws JsonProcessingException {
-
-        RestAssured.baseURI = "https://petstore3.swagger.io";
-
-        RandomCodes.Pet.Category category = new RandomCodes.Pet.Category(1, "Cat");
-        List<String> photourls = Arrays.asList("https://catimage1.jpg", "https://catimage2.jpg"); //since java 1.2, mutable (means we can modify the elements)
-        //List<String> photourls = List.of("https://catimage1.jpg", "https://catimage2.jpg"); //since java 9 (immutable)
-
-        Tag tag1 = new Tag(11, "red");
-        Tag tag2 = new Tag(21, "blue");
-
-        List<Tag> tags = Arrays.asList(tag1, tag2); //since java 1.2, mutable (means we can modify the elements)
-        //List<Pet.Tag> tags = List.of(tag1, tag2); //since java 9 (immutable)
-
-        RandomCodes.Pet pet = new RandomCodes.Pet(101, "Roomy", "Available", category, photourls, tags);
-
-        Response response = given().log().all().contentType(ContentType.JSON).body(pet).when().log().all().post("/api/v3/pet");
-        System.out.println("<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>");
-        response.prettyPrint();
-
-        //Deserialization JSON to POJO
-
-        ObjectMapper mapper = new ObjectMapper();
-
-        RandomCodes.Pet petRes = mapper.readValue(response.getBody().asString(), RandomCodes.Pet.class);
-        System.out.println(petRes.getCategory().getId());
-        System.out.println(petRes.getCategory().getName());
-        System.out.println(petRes.getId());
-        System.out.println(petRes.getTags());
-        System.out.println(petRes.getName());
-        System.out.println(petRes.getPhotoUrls());
+/**
+ * Validates that the specified client has all expected encryption key types in the database
+ * 
+ * @param clientId The client ID to validate
+ * @param expectedKeyTypes List of expected key types
+ * @throws SQLException if there's a database error or validation fails
+ */
+public void validateClientEncryption(String clientId, List<String> expectedKeyTypes) throws SQLException {
+    if (clientId == null || clientId.trim().isEmpty()) {
+        throw new IllegalArgumentException("Client ID cannot be null or empty");
+    }
+    if (expectedKeyTypes == null || expectedKeyTypes.isEmpty()) {
+        throw new IllegalArgumentException("Expected key types list cannot be null or empty");
     }
 
-    @Test
-    public void createPetUsingBuilderTest() throws JsonProcessingException {
-
-        RestAssured.baseURI = "https://petstore3.swagger.io";
-
-        RandomCodes.Pet.Category category = new RandomCodes.Pet.Category.CategoryBuilder().id(5).name("Dog").build();
-        Tag tag1 = new Tag.TagBuilder().id(104).name("Blue").build();
-        Tag tag2 = new Tag.TagBuilder().id(106).name("Red").build();
-        List<Tag> tag = Arrays.asList(tag1, tag2);
-        List<String> photoUrls = Arrays.asList("Dog1Image", "Dog2Image");
-        RandomCodes.Pet pet = new RandomCodes.Pet.PetBuilder().id(1011).name("Tommy").status("Active").category(category).tags(tag).photoUrls(photoUrls).build();
-        Response response = given().log().all().contentType(ContentType.JSON).body(pet).when().log().all().post("/api/v3/pet");
-        System.out.println("<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>");
-        response.prettyPrint();
-
-        //Deserialization JSON to POJO
-
-        ObjectMapper mapper = new ObjectMapper();
-
-        RandomCodes.Pet petRes = mapper.readValue(response.getBody().asString(), Pet.class);
-        System.out.println(petRes.getCategory().getId());
-        System.out.println(petRes.getCategory().getName());
-        System.out.println(petRes.getId());
-        System.out.println(petRes.getTags());
-        System.out.println(petRes.getName());
-        System.out.println(petRes.getPhotoUrls());
-
+    Set<String> actualKeyTypes = new HashSet<>();
+    String query = "SELECT CLNT_ID, KEY_TYPE FROM CLIENT_ENCRYPTION_DETAILS WHERE CLNT_ID = ?";
+    
+    try (Connection conn = PdambDsManager.getInstance().getDataSource(rdrConfig).getConnection();
+         PreparedStatement ps = conn.prepareStatement(query)) {
+        
+        ps.setString(1, clientId);
+        
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                DBUtils.waitForDBUpdate();
+                String dbClientId = rs.getString("CLNT_ID");
+                String dbKeyType = rs.getString("KEY_TYPE");
+                
+                AonAssert.assertEquals(dbClientId, clientId, 
+                    "Validating entry for the onboarded clientId in the Client Encryption Details Table");
+                
+                actualKeyTypes.add(dbKeyType);
+            }
+        }
     }
 
+    // Validate all expected key types are present
+    for (String expectedType : expectedKeyTypes) {
+        AonAssert.assertTrue(actualKeyTypes.contains(expectedType),
+            String.format("Validating Key Type '%s' found in Client Encryption Details", expectedType));
+    }
+
+    Logger.info("All expected key types {} found for clientId {}", expectedKeyTypes, clientId);
 }
