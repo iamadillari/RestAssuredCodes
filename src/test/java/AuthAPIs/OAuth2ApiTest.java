@@ -9,7 +9,7 @@ import org.testng.annotations.Test;
 import static io.restassured.RestAssured.given;
 
 /**
- * OAuth2ApiTest is a test class that demonstrates the use of OAuth 2.0 authentication
+ * OAuth2ApiTest is a Test class that demonstrates the use of OAuth 2.0 authentication
  * for making HTTP requests to an API. It includes methods to generate an access token
  * and retrieve flight details using that token.
  *
@@ -78,7 +78,7 @@ public class OAuth2ApiTest {
      * 3. Validates that the response status code is 200.
      */
     @Test
-    public void getFlightDetailsUsingOauth2Test(){
+    public void getFlightDetailsUsingOAuth2Test(){
         System.out.println("<<<<<<<<<<Starting Oauth 2.0 Test>>>>>>>>>>");
         given().log().all()
                 .auth().oauth2(accessToken) // Uses RestAssured's OAuth2 method
