@@ -1,0 +1,43 @@
+TODO: Practice with BookingAPITests Package for ContactsAPI and implement the logic and tests
+
+
+----Currently going through with 9th video of Naveen's Rest assured sessions
+  //TODO (PARKED) : @36:40 video 8th for XML Path
+
+// TODO: Framework Designing 01 video @27 mins
+
+ >> ALLURE/Chain Report implementation is pending
+
+ -----------------------
+
+ small JSON ---> POJO
+ ObjectMapper ---> get/set and assert
+
+Huge JSON (100-150 key value pairs/attributes) ----> POJO
+But consider only 5-6 important key value pairs or attributes validation is required
+Then, we will go with jsonPathQuery using 'JAYWAY JsonPath' Library
+
+we can use conditional based query similar to SQL and get the RESULT for the validations
+
+
+----------------------------------------------------------------NOTES STARTED----------------------------------------------------------------
+
+$[?(@.title =~/.*Backpack.*/i)].id
+
+$ Refers to the root of the JSON.
+
+?(@.title =~ /.*Backpack.*/i) → This filters elements where the title matches the regex pattern:
+
+@.title accesses the title field of each object.
+
+=~ means "matches regex".
+
+/.*Backpack.*/i is a regular expression that matches any title containing "Backpack", regardless of case.
+
+.* allows any characters before or after "Backpack".
+
+i makes the match case-insensitive ("backpack", "BackPack", "BACKPACK", etc.).
+
+.id > -Extracts the id field from the filtered results.
+
+----------------------------------------------------------------NOTES ENDED----------------------------------------------------------------

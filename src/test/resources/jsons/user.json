@@ -1,0 +1,6 @@
+{
+  "name": "Manish",
+  "gender": "male",
+  "email": "{{email}}",
+  "status": "active"
+}
