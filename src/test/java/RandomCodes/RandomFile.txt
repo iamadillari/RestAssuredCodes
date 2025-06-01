@@ -1,0 +1,67 @@
+/**
+ * Validates client encryption key types in the database
+ *
+ * @param axonEnckeyMessage The encryption key message
+ * @param clientId The client ID to validate
+ * @param keyTypes The expected key types to verify
+ * @throws SQLException if there's a database error
+ */
+protected void verifyEncryptionKeyEventKeyTypeInDB(AxonEnckeyMessage axonEnckeyMessage,
+                                                 String clientId,
+                                                 KeyType... keyTypes) throws SQLException {
+    if (keyTypes == null || keyTypes.length == 0) {
+        throw new IllegalArgumentException("At least one key type must be provided");
+    }
+
+    List<String> expectedKeyTypes = Arrays.stream(keyTypes)
+                                        .map(Enum::name)
+                                        .collect(Collectors.toList());
+
+    validateClientEncryption(clientId, expectedKeyTypes);
+}
+
+/**
+ * Validates that the specified client has all expected encryption key types in the database
+ *
+ * @param clientId The client ID to validate
+ * @param expectedKeyTypes List of expected key types
+ * @throws SQLException if there's a database error or validation fails
+ */
+public void validateClientEncryption(String clientId, List<String> expectedKeyTypes) throws SQLException {
+    if (clientId == null || clientId.trim().isEmpty()) {
+        throw new IllegalArgumentException("Client ID cannot be null or empty");
+    }
+    if (expectedKeyTypes == null || expectedKeyTypes.isEmpty()) {
+        throw new IllegalArgumentException("Expected key types list cannot be null or empty");
+    }
+
+    Set<String> actualKeyTypes = new HashSet<>();
+    String query = "SELECT CLNT_ID, KEY_TYPE FROM CLIENT_ENCRYPTION_DETAILS WHERE CLNT_ID = ?";
+
+    try (Connection conn = PdambDsManager.getInstance().getDataSource(rdrConfig).getConnection();
+         PreparedStatement ps = conn.prepareStatement(query)) {
+
+        ps.setString(1, clientId);
+
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                DBUtils.waitForDBUpdate();
+                String dbClientId = rs.getString("CLNT_ID");
+                String dbKeyType = rs.getString("KEY_TYPE");
+
+                AonAssert.assertEquals(dbClientId, clientId,
+                    "Validating entry for the onboarded clientId in the Client Encryption Details Table");
+
+                actualKeyTypes.add(dbKeyType);
+            }
+        }
+    }
+
+    // Validate all expected key types are present
+    for (String expectedType : expectedKeyTypes) {
+        AonAssert.assertTrue(actualKeyTypes.contains(expectedType),
+            String.format("Validating Key Type '%s' found in Client Encryption Details", expectedType));
+    }
+
+    Logger.info("All expected key types {} found for clientId {}", expectedKeyTypes, clientId);
+}
